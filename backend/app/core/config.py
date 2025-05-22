@@ -13,14 +13,14 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
     
     # Секретный ключ
-    SECRET_KEY: str
+    SECRET_KEY: str = "changeme"
     
     # База данных PostgreSQL
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    POSTGRES_HOST: str
-    POSTGRES_PORT: int
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "aegis"
+    POSTGRES_HOST: str = "db"
+    POSTGRES_PORT: int = 5432
     
     # Настройки бэкэнда
     BACKEND_HOST: str = "0.0.0.0"
@@ -37,14 +37,17 @@ class Settings(BaseSettings):
         """Получение строки подключения к базе данных"""
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
-    @field_validator("CORS_ORIGINS")
+    @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
-            return v
-        raise ValueError(v)
+        if isinstance(v, str):
+            try:
+                v = eval(v)  # Безопасно для списков в строковом формате
+                if isinstance(v, list):
+                    return v
+            except:
+                return [i.strip() for i in v.split(",")]
+        return v
     
     class Config:
         env_file = ".env"

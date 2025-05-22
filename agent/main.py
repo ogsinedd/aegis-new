@@ -55,7 +55,8 @@ app.add_middleware(
 )
 
 # Инициализация клиента Docker
-docker_client = docker.APIClient(base_url='unix:///var/run/docker.sock')
+os.environ['DOCKER_HOST'] = 'unix:///var/run/docker.sock'
+docker_client = docker.from_env()
 
 @app.get("/")
 async def read_root():
