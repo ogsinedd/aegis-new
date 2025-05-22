@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000", "http://localhost:5000"]
     
     # Секретный ключ
     SECRET_KEY: str = "changeme"

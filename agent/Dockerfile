@@ -10,6 +10,12 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Создание группы docker с тем же GID, что и на хосте
+RUN groupadd -g 999 docker
+
+# Добавление пользователя в группу docker
+RUN usermod -aG docker root
+
 WORKDIR /app
 
 # Копирование зависимостей и установка
