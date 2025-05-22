@@ -52,4 +52,18 @@ class ScanResult(ScanHistory):
     vulnerabilities: List[Vulnerability] = []
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+# Response schemas
+class ScanResponse(ScanBase):
+    finished_at: Optional[datetime] = None
+    error: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class ScanHistoryResponse(ScanHistory):
+    pass
+
+class VulnerabilityResponse(Vulnerability):
+    pass 
