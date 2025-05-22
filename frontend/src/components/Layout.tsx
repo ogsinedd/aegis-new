@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { Home, ShieldAlert, History, SettingsIcon, BarChart3 } from 'lucide-react';
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 const navItems = [
   { href: '/hosts', label: 'Hosts', icon: Home },
