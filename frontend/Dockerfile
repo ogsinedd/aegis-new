@@ -22,6 +22,9 @@ FROM base AS builder
 # Копируем файлы проекта
 COPY . .
 
+# Проверяем, что файл utils.ts существует
+RUN test -f src/lib/utils.ts || (echo "ERROR: utils.ts not found! Creating it..." && mkdir -p src/lib && echo "import { type ClassValue, clsx } from \"clsx\"\nimport { twMerge } from \"tailwind-merge\"\n\nexport function cn(...inputs: ClassValue[]) {\n  return twMerge(clsx(inputs))\n}" > src/lib/utils.ts)
+
 # Копируем зависимости
 COPY --from=deps /app/node_modules ./node_modules
 

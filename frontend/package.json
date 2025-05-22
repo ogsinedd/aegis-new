@@ -32,17 +32,26 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@eslint/config-array": "^1.0.0",
+    "@eslint/object-schema": "^1.1.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.0.1",
-    "eslint": "8.57.0",
+    "eslint": "^9.0.0-beta.2",
     "eslint-config-next": "14.2.0",
-    "glob": "10.3.10",
-    "lru-cache": "10.2.0",
+    "glob": "^10.3.10",
+    "lru-cache": "^10.2.0",
     "postcss": "^8",
-    "rimraf": "3.0.2",
+    "rimraf": "^5.0.5",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "glob": "^10.3.10",
+    "rimraf": "^5.0.5",
+    "@humanwhocodes/config-array": "^1.0.0",
+    "@humanwhocodes/object-schema": "^1.0.0",
+    "inflight": "^2.0.0"
   }
 }
