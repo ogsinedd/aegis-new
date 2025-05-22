@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
+import json
 
 class Settings(BaseSettings):
     # Настройки проекта
@@ -42,10 +43,10 @@ class Settings(BaseSettings):
     def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
         if isinstance(v, str):
             try:
-                v = eval(v)  # Безопасно для списков в строковом формате
-                if isinstance(v, list):
-                    return v
-            except:
+                # Попытка распарсить как JSON
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # Если не JSON, разделяем по запятой
                 return [i.strip() for i in v.split(",")]
         return v
     
