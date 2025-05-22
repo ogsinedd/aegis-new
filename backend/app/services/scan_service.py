@@ -222,14 +222,34 @@ class ScanService:
                 
                 vulnerabilities = result.get("Vulnerabilities", [])
                 for vuln_data in vulnerabilities:
+                    # Извлекаем рекомендации и описание из результатов Trivy
+                    description = vuln_data.get("Description", "")
+                    
+                    # Получаем рекомендации из различных полей Trivy
+                    primary_recommendation = vuln_data.get("PrimaryURL", "")
+                    fixed_version = vuln_data.get("FixedVersion", "")
+                    references = vuln_data.get("References", [])
+                    
+                    # Формируем рекомендацию на основе доступных данных
+                    recommendation = ""
+                    if fixed_version:
+                        recommendation += f"Обновите до версии: {fixed_version}. "
+                    
+                    if primary_recommendation:
+                        recommendation += f"Подробнее: {primary_recommendation}"
+                    
+                    # Если нет основной рекомендации, но есть дополнительные ссылки
+                    if not recommendation and references:
+                        recommendation = f"Дополнительная информация: {references[0]}"
+                    
                     # Создаем запись уязвимости
                     vulnerability = Vulnerability(
                         scan_id=scan_id,
                         cve_id=vuln_data.get("VulnerabilityID", "Unknown"),
                         cvss=vuln_data.get("CVSS", {}).get("V3Score", ""),
                         severity=vuln_data.get("Severity", ""),
-                        description=vuln_data.get("Description", ""),
-                        recommendation=vuln_data.get("FixedVersion", ""),
+                        description=description,
+                        recommendation=recommendation,
                         details=vuln_data
                     )
                     db.add(vulnerability)
@@ -239,4 +259,52 @@ class ScanService:
         
         except Exception as e:
             logger.error(f"Error processing vulnerabilities for scan {scan_id}: {str(e)}")
-            db.rollback() 
+            db.rollback()
+
+    # Добавляем новый метод для скачивания отчета
+    @staticmethod
+    def get_scan_report(db: Session, scan_id: str, format: str = 'json') -> Optional[Dict[str, Any]]:
+        """Получение полного отчета сканирования в JSON или CSV формате"""
+        try:
+            # Получаем данные сканирования
+            scan = ScanService.get_scan_by_id(db, scan_id)
+            if not scan:
+                logger.error(f"Scan not found: {scan_id}")
+                return None
+                
+            # Получаем все уязвимости для этого сканирования
+            vulnerabilities = ScanService.get_vulnerabilities(db, scan_id=scan_id)
+            
+            # Формируем отчет
+            report = {
+                "scan_id": scan.scan_id,
+                "host_id": scan.host_id,
+                "container_id": scan.container_id,
+                "status": scan.status.value,
+                "started_at": scan.started_at.isoformat() if scan.started_at else None,
+                "finished_at": scan.finished_at.isoformat() if scan.finished_at else None,
+                "vulnerabilities": []
+            }
+            
+            # Добавляем уязвимости в отчет
+            for vuln in vulnerabilities:
+                vulnerability_data = {
+                    "id": vuln.id,
+                    "cve_id": vuln.cve_id,
+                    "severity": vuln.severity,
+                    "cvss": vuln.cvss,
+                    "description": vuln.description,
+                    "recommendation": vuln.recommendation
+                }
+                
+                # Добавляем полные детали только для JSON формата
+                if format == 'json' and vuln.details:
+                    vulnerability_data["details"] = vuln.details
+                
+                report["vulnerabilities"].append(vulnerability_data)
+            
+            return report
+            
+        except Exception as e:
+            logger.error(f"Error getting scan report for {scan_id}: {str(e)}")
+            return None 

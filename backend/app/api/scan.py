@@ -1,5 +1,9 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+import csv
+import io
+import json
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from loguru import logger
 
@@ -47,6 +51,58 @@ async def get_scan_status(
     )
     
     return result
+
+@router.get("/{scan_id}/report")
+async def get_scan_report(
+    scan_id: str,
+    format: str = Query("json", regex="^(json|csv)$"),
+    db: Session = Depends(get_db)
+):
+    """
+    Скачивание отчета о сканировании в формате JSON или CSV
+    - **scan_id**: ID сканирования
+    - **format**: Формат отчета (json или csv)
+    """
+    # Получаем отчет
+    report = ScanService.get_scan_report(db, scan_id, format)
+    if not report:
+        raise HTTPException(status_code=404, detail="Scan report not found")
+    
+    # Формируем имя файла
+    filename = f"aegis-scan-report-{scan_id}"
+    
+    if format == "json":
+        # Возвращаем JSON
+        return Response(
+            content=json.dumps(report, indent=2, ensure_ascii=False),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={filename}.json"}
+        )
+    else:
+        # Формируем CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Заголовки CSV
+        writer.writerow(["scan_id", "cve_id", "severity", "cvss", "description", "recommendation"])
+        
+        # Данные
+        for vuln in report["vulnerabilities"]:
+            writer.writerow([
+                report["scan_id"],
+                vuln["cve_id"],
+                vuln["severity"],
+                vuln["cvss"],
+                vuln["description"],
+                vuln["recommendation"]
+            ])
+        
+        # Возвращаем CSV
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}.csv"}
+        )
 
 @router.get("/history", response_model=List[ScanHistory])
 def get_scan_history(

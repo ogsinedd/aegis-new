@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api import hosts, containers, scan
+from app.api import hosts, containers, scan, remediation
 
 api_router = APIRouter()
 
@@ -29,4 +29,11 @@ api_router.include_router(
     scan.router,
     prefix="/scan",
     tags=["scan"]
+)
+
+# Подключаем эндпоинты для управления исправлением
+api_router.include_router(
+    remediation.router,
+    prefix="/remediation",
+    tags=["remediation"]
 ) 
