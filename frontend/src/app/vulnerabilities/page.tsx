@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Vulnerability, scanService } from "@/services/scanService";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
-export default function VulnerabilitiesPage() {
+function VulnerabilitiesContent() {
   const searchParams = useSearchParams();
   
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
@@ -220,5 +220,13 @@ export default function VulnerabilitiesPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function VulnerabilitiesPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto flex justify-center items-center h-64">Загрузка...</div>}>
+      <VulnerabilitiesContent />
+    </Suspense>
   );
 } 

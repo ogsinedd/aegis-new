@@ -86,13 +86,17 @@ export default function VulnerabilitiesTable({ vulnerabilities, onRefresh }: Vul
   };
 
   const calculateDowntime = async (vulnerability: Vulnerability, strategyId: string) => {
+    setDowntimeEstimate(null);
+    
     try {
       // В реальном приложении здесь должны быть данные о контейнерах, 
       // на которые повлияет исправление
-      const containerIds = ["container1"]; // Заглушка
-      const parallelism = 1; // Заглушка, в реальном приложении должно быть настраиваемым
       
-      const estimate = await scanService.estimateDowntime(containerIds, strategyId, parallelism);
+      const estimate = await scanService.estimateDowntime({
+        scan_id: vulnerability.scan_id,
+        vulnerability_id: vulnerability.id,
+        strategy: strategyId as "hot-patch" | "rolling-update" | "restart"
+      });
       setDowntimeEstimate(estimate);
     } catch (error) {
       console.error("Ошибка при расчете времени простоя:", error);
@@ -115,10 +119,11 @@ export default function VulnerabilitiesTable({ vulnerabilities, onRefresh }: Vul
 
     setIsApplying(true);
     try {
-      const result = await scanService.applyRemediation(
-        selectedVulnerability.id,
-        selectedStrategyId
-      );
+      const result = await scanService.applyRemediation({
+        scan_id: selectedVulnerability.scan_id,
+        vulnerability_id: selectedVulnerability.id,
+        strategy: selectedStrategyId as "hot-patch" | "rolling-update" | "restart"
+      });
       
       if (result.success) {
         toast.success(result.message || "Исправление успешно применено");
@@ -279,10 +284,10 @@ export default function VulnerabilitiesTable({ vulnerabilities, onRefresh }: Vul
                           <h4 className="font-medium">Estimated Downtime</h4>
                         </div>
                         <p className="text-sm">
-                          Затронуто контейнеров: {downtimeEstimate.affectedContainers}
+                          Затронуто контейнеров: {downtimeEstimate.affected_containers}
                         </p>
                         <p className="text-sm">
-                          Ожидаемое время простоя: {formatTime(downtimeEstimate.totalTime)}
+                          Ожидаемое время простоя: {formatTime(downtimeEstimate.estimated_time)}
                         </p>
                       </div>
                     )}

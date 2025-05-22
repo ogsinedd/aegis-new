@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Container, containersService } from "@/services/containersService";
@@ -9,7 +9,7 @@ import ContainersTable from "@/components/containers/ContainersTable";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export default function ContainersPage() {
+function ContainersContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -124,5 +124,13 @@ export default function ContainersPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ContainersPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto flex justify-center items-center h-64">Загрузка...</div>}>
+      <ContainersContent />
+    </Suspense>
   );
 } 
