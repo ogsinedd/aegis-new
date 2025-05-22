@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 const STREAM_URL = `${import.meta.env.VITE_API_URL?.replace(/^http/, 'ws')}/containers/stream`;

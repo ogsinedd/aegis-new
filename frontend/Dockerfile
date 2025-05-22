@@ -1,13 +1,14 @@
 # Stage 1: Build the React application
-FROM node:18-alpine AS build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json (or yarn.lock)
+# Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies with cache mount for better performance
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy the rest of the application code
 COPY . .
@@ -17,8 +18,7 @@ COPY . .
 # but for client-side code, it's better to use runtime env variables.
 RUN npm run build
 
-# Stage 2: Serve the application with a lightweight server (e.g., Caddy or Nginx)
-# Using Caddy for simplicity and auto HTTPS (though for internal Docker network, HTTP is fine)
+# Stage 2: Serve the application with Caddy
 FROM caddy:2-alpine
 
 WORKDIR /srv
@@ -26,13 +26,15 @@ WORKDIR /srv
 # Copy the built static files from the build stage
 COPY --from=build /app/dist .
 
-# Caddyfile to serve the static files and handle SPA routing
-# For SPA, all requests not matching a file should go to index.html
+# Copy Caddyfile for SPA routing
 COPY Caddyfile .
 
-# Expose the port Caddy will listen on (default is 80 for HTTP, 443 for HTTPS)
-# The docker-compose.yml maps 3000 on the host to this container's port (e.g. 80)
-# Caddy by default serves on port 80 if not specified otherwise in Caddyfile.
+# Expose port 80 (HTTP)
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
 
 # Command to run Caddy (already default in caddy image, but can be explicit)
 # CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"] 

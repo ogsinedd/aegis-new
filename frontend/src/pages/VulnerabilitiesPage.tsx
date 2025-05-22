@@ -17,11 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { Loader2, AlertTriangle, ShieldCheck, Clock, Wrench } from 'lucide-react';
+import { Loader2, AlertTriangle, Clock, Wrench, AlertOctagon, AlertCircle, Shield } from 'lucide-react';
 import { Toaster } from '../components/ui/sonner';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
 import type { CheckedState } from '@radix-ui/react-checkbox';
+import { VulnerabilityDetails } from '../components/VulnerabilityDetails';
+import { ExportReportButton } from '../components/ExportReportButton';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 
 // TODO: Define types based on API response
 interface Vulnerability {
@@ -62,6 +65,7 @@ const VulnerabilitiesPage = () => {
   const [selectedRows, setSelectedRows] = useState<Record<string, boolean>>({});
   const [selectedScenario, setSelectedScenario] = useState<RemediationScenario | '' >('');
   const [applyingRemediation, setApplyingRemediation] = useState(false);
+  const [selectedVulnerability, setSelectedVulnerability] = useState<Vulnerability | null>(null);
 
   const fetchVulnerabilities = async () => {
     setLoading(true);
@@ -157,6 +161,54 @@ const VulnerabilitiesPage = () => {
   
   // TODO: Add a debounce for filter inputs if performance becomes an issue
 
+  const handleViewDetails = (vuln: Vulnerability) => {
+    setSelectedVulnerability(vuln);
+  };
+
+  // Добавляем статистику по уязвимостям
+  const stats = useMemo(() => {
+    return {
+      critical: vulnerabilities.filter(v => v.severity === 'Critical').length,
+      high: vulnerabilities.filter(v => v.severity === 'High').length,
+      medium: vulnerabilities.filter(v => v.severity === 'Medium').length,
+      low: vulnerabilities.filter(v => v.severity === 'Low').length,
+    };
+  }, [vulnerabilities]);
+
+  // Функция экспорта отчета
+  const handleExport = async (format: 'json' | 'csv') => {
+    const selectedVulns = selectedVulnerabilities.length > 0 
+      ? selectedVulnerabilities 
+      : vulnerabilities;
+
+    const data = format === 'json' 
+      ? JSON.stringify(selectedVulns, null, 2)
+      : convertToCSV(selectedVulns);
+
+    const blob = new Blob([data], { type: `text/${format}` });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `vulnerabilities-report.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  };
+
+  const convertToCSV = (vulns: Vulnerability[]) => {
+    const headers = ['CVE ID', 'Severity', 'CVSS', 'Host', 'Container', 'Description'];
+    const rows = vulns.map(v => [
+      v.cve_id,
+      v.severity,
+      v.cvss || '',
+      v.host_name || '',
+      v.container_name || '',
+      `"${v.description.replace(/"/g, '""')}"`,
+    ]);
+    return [headers, ...rows].map(row => row.join(',')).join('\n');
+  };
+
   if (loading && !applyingRemediation) {
     return <div className="flex justify-center items-center h-screen"><Loader2 className="h-16 w-16 animate-spin text-accent" /></div>;
   }
@@ -164,8 +216,52 @@ const VulnerabilitiesPage = () => {
   return (
     <div className="container mx-auto p-4">
       <Toaster richColors />
-      <h1 className="text-2xl font-bold mb-4">Vulnerabilities</h1>
       
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Vulnerabilities</h1>
+        <ExportReportButton onExport={handleExport} />
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Critical</CardTitle>
+            <AlertOctagon className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">{stats.critical}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">High</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-500">{stats.high}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Medium</CardTitle>
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-500">{stats.medium}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low</CardTitle>
+            <Shield className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-500">{stats.low}</div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filter Section - TODO: Make this more organized, perhaps in a collapsible section */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 p-4 border rounded-lg">
         <Input placeholder="CVE ID (e.g., CVE-2023-1234)" name="cveId" value={filters.cveId} onChange={handleFilterChange} />
@@ -237,12 +333,17 @@ const VulnerabilitiesPage = () => {
         </TableHeader>
         <TableBody>
           {vulnerabilities.map((vuln) => (
-            <TableRow key={vuln.id} data-state={selectedRows[vuln.id] && "selected"}>
-              <TableCell>
+            <TableRow 
+              key={vuln.id} 
+              data-state={selectedRows[vuln.id] && "selected"}
+              className="cursor-pointer hover:bg-accent/5"
+              onClick={() => handleViewDetails(vuln)}
+            >
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <Checkbox 
-                    checked={!!selectedRows[vuln.id]}
-                    onCheckedChange={() => handleRowSelect(vuln.id)}
-                    aria-label={`Select row for ${vuln.cve_id}`}
+                  checked={!!selectedRows[vuln.id]}
+                  onCheckedChange={() => handleRowSelect(vuln.id)}
+                  aria-label={`Select row for ${vuln.cve_id}`}
                 />
               </TableCell>
               <TableCell className="font-mono text-xs">{vuln.cve_id}</TableCell>
@@ -269,6 +370,13 @@ const VulnerabilitiesPage = () => {
           No vulnerabilities found matching your criteria.
         </div>
       )}
+
+      {/* Компонент детального просмотра */}
+      <VulnerabilityDetails
+        vulnerability={selectedVulnerability}
+        isOpen={!!selectedVulnerability}
+        onClose={() => setSelectedVulnerability(null)}
+      />
     </div>
   );
 };

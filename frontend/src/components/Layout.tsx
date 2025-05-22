@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Home, ListCollapse, ShieldAlert, History, SettingsIcon, BarChart3 } from 'lucide-react';
+import { Home, ShieldAlert, History, SettingsIcon, BarChart3 } from 'lucide-react';
 import { cn } from '../lib/utils'; // Corrected path for cn utility
 
 const navItems = [

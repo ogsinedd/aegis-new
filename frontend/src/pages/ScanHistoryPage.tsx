@@ -27,7 +27,7 @@ import {
   DialogFooter,
   DialogClose
 } from "../components/ui/dialog"
-import { Loader2, MoreHorizontal, Eye, Download, FileText, AlertCircle, ListChecks } from 'lucide-react';
+import { Loader2, MoreHorizontal, Download, FileText, AlertCircle, ListChecks } from 'lucide-react';
 import { Toaster } from '../components/ui/sonner';
 import { toast } from 'sonner';
 
