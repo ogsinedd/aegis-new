@@ -1,67 +1,38 @@
-FROM node:20-alpine AS base
+# Stage 1: Build the React application
+FROM node:18-alpine AS build
 
-# Установка дополнительных инструментов
-RUN apk add --no-cache bash
-
-# Установка рабочей директории
 WORKDIR /app
 
-# Этап установки зависимостей
-FROM base AS deps
+# Copy package.json and package-lock.json (or yarn.lock)
+COPY package*.json ./
 
-# Копируем файлы для установки зависимостей
-COPY package.json .npmrc ./
+# Install dependencies
+RUN npm install
 
-# Установка зависимостей с учетом производственного режима
-# Используем npm install вместо npm ci, чтобы пересоздать package-lock.json
-RUN npm cache clean --force && npm install -g npm@latest && npm install --no-fund --no-audit && npm cache clean --force
-
-# Этап сборки приложения
-FROM base AS builder
-
-# Копируем файлы проекта
+# Copy the rest of the application code
 COPY . .
 
-# Проверяем, что файл utils.ts существует
-RUN test -f src/lib/utils.ts || (echo "ERROR: utils.ts not found! Creating it..." && mkdir -p src/lib && echo "import { type ClassValue, clsx } from \"clsx\"\nimport { twMerge } from \"tailwind-merge\"\n\nexport function cn(...inputs: ClassValue[]) {\n  return twMerge(clsx(inputs))\n}" > src/lib/utils.ts)
-
-# Копируем зависимости
-COPY --from=deps /app/node_modules ./node_modules
-
-# Отключаем телеметрию Next.js
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Создаем файл .env.production с переменными окружения
-RUN echo "NEXT_PUBLIC_API_URL=http://backend:8000/v1" > .env.production
-
-# Выполняем сборку приложения (в Next.js 'standalone' уже установлен в next.config.js)
+# Build the application
+# The `VITE_API_URL` will be passed during docker-compose build or runtime if needed for build step,
+# but for client-side code, it's better to use runtime env variables.
 RUN npm run build
 
-# Проверяем, что standalone директория была создана
-RUN test -d .next/standalone || (echo "ERROR: Standalone output not generated!" && exit 1)
+# Stage 2: Serve the application with a lightweight server (e.g., Caddy or Nginx)
+# Using Caddy for simplicity and auto HTTPS (though for internal Docker network, HTTP is fine)
+FROM caddy:2-alpine
 
-# Финальный образ
-FROM base AS runner
+WORKDIR /srv
 
-# Настройка переменных окружения
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+# Copy the built static files from the build stage
+COPY --from=build /app/dist .
 
-# Создаем непривилегированного пользователя
-RUN addgroup -S -g 1001 nodejs && \
-    adduser -S -u 1001 -G nodejs nextjs && \
-    mkdir -p /app/.next && \
-    chown -R nextjs:nodejs /app
+# Caddyfile to serve the static files and handle SPA routing
+# For SPA, all requests not matching a file should go to index.html
+COPY Caddyfile .
 
-# Копируем необходимые файлы из этапа сборки
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Expose the port Caddy will listen on (default is 80 for HTTP, 443 for HTTPS)
+# The docker-compose.yml maps 3000 on the host to this container's port (e.g. 80)
+# Caddy by default serves on port 80 if not specified otherwise in Caddyfile.
 
-# Переключаемся на непривилегированного пользователя
-USER nextjs
-
-# Настройка порта и запуск
-EXPOSE 3000
-CMD ["node", "server.js"] 
+# Command to run Caddy (already default in caddy image, but can be explicit)
+# CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"] 

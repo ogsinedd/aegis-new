@@ -56,9 +56,9 @@ services:
     container_name: aegis-frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000/v1
+      - VITE_API_URL=http://backend:8000/v1
     ports:
-      - "3000:3000"
+      - "3000:80"
     depends_on:
       - backend
 
