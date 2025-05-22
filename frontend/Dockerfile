@@ -14,7 +14,7 @@ COPY package.json .npmrc ./
 
 # Установка зависимостей с учетом производственного режима
 # Используем npm install вместо npm ci, чтобы пересоздать package-lock.json
-RUN npm install -g npm@latest && npm install --no-fund --no-audit
+RUN npm cache clean --force && npm install -g npm@latest && npm install --no-fund --no-audit && npm cache clean --force
 
 # Этап сборки приложения
 FROM base AS builder
