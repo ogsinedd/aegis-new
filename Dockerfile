@@ -5,22 +5,22 @@ RUN apk add --no-cache nodejs npm
 
 # Только установка зависимостей
 FROM base AS deps
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Копируем файлы package.json и устанавливаем зависимости одной командой
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install --force clsx tailwind-merge sonner date-fns axios lucide-react && \
     npm ci --force
 
 # Сборка приложения
 FROM base AS builder
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Копируем файлы зависимостей из предыдущего шага
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/frontend/node_modules ./node_modules
 
 # Копируем исходный код
-COPY . .
+COPY frontend/. .
 
 # Отключаем телеметрию Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -40,7 +40,7 @@ RUN mkdir -p src/lib src/components/ui && \
 
 # Производственный образ
 FROM base AS runner
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Задаем переменные окружения
 ENV NODE_ENV production
@@ -53,9 +53,9 @@ RUN addgroup -S -g 1001 nodejs && \
     chown -R nextjs:nodejs .next
 
 # Копируем статические файлы и сборку
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/frontend/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/frontend/.next/static ./.next/static
 
 # Переключаемся на непривилегированного пользователя
 USER nextjs
