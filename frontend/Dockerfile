@@ -10,10 +10,11 @@ WORKDIR /app
 FROM base AS deps
 
 # Копируем файлы для установки зависимостей
-COPY package.json package-lock.json* .npmrc ./
+COPY package.json .npmrc ./
 
 # Установка зависимостей с учетом производственного режима
-RUN npm ci
+# Используем npm install вместо npm ci, чтобы пересоздать package-lock.json
+RUN npm install --no-fund --no-audit
 
 # Этап сборки приложения
 FROM base AS builder
