@@ -20,8 +20,8 @@ export interface Vulnerability {
   id: string;
   scan_id: string;
   cve_id: string;
-  cvss?: string;
-  severity?: string;
+  cvss: string;
+  severity: string;
   description?: string;
   recommendation?: string;
   details?: any;
@@ -42,52 +42,93 @@ export interface RemediationStrategy {
 
 // Оценка времени простоя
 export interface DowntimeEstimate {
-  totalTime: number; // в секундах
-  affectedContainers: number;
+  estimated_time: number; // в секундах
+  affected_containers: number;
+  strategy: string;
+}
+
+export interface Scan {
+  scan_id: string;
+  host_id: string;
+  container_id: string;
+  started_at: string;
+  finished_at?: string;
+  status: "pending" | "running" | "completed" | "error";
+  vulnerability_count?: number;
+}
+
+export interface RemediationRequest {
+  scan_id: string;
+  vulnerability_id?: string;
+  strategy: "hot-patch" | "rolling-update" | "restart";
 }
 
 export const scanService = {
-  // Начать новое сканирование
-  startScan: async (request: ScanRequest): Promise<ScanHistory> => {
-    const response = await api.post("/scan", request);
-    return response.data;
-  },
-
-  // Получить статус и результаты сканирования
-  getScanStatus: async (scanId: string): Promise<ScanResult> => {
-    const response = await api.get(`/scan/${scanId}`);
-    return response.data;
-  },
-
   // Получить историю сканирований
-  getScanHistory: async (skip: number = 0, limit: number = 100): Promise<ScanHistory[]> => {
-    const response = await api.get("/scan/history", {
-      params: { skip, limit },
-    });
+  getScanHistory: async (): Promise<Scan[]> => {
+    const response = await api.get("/v1/scan");
     return response.data;
   },
 
-  // Получить уязвимости с фильтрацией
-  getVulnerabilities: async (
-    params: {
-      scan_id?: string;
-      host_id?: string;
-      container_id?: string;
-      skip?: number;
-      limit?: number;
-    } = {}
-  ): Promise<Vulnerability[]> => {
-    const response = await api.get("/scan/vulnerabilities", { params });
+  // Получить данные конкретного сканирования
+  getScan: async (scanId: string): Promise<Scan> => {
+    const response = await api.get(`/v1/scan/${scanId}`);
     return response.data;
   },
 
-  // Скачать отчет сканирования
-  downloadScanReport: async (scanId: string, format: 'json' | 'csv' = 'json'): Promise<Blob> => {
-    const response = await api.get(`/scan/${scanId}/report`, {
+  // Запустить новое сканирование
+  startScan: async (request: ScanRequest): Promise<Scan> => {
+    const response = await api.post("/v1/scan", request);
+    return response.data;
+  },
+
+  // Получить уязвимости
+  getVulnerabilities: async (params?: { 
+    host_id?: string; 
+    container_id?: string;
+    scan_id?: string;
+  }): Promise<Vulnerability[]> => {
+    const response = await api.get("/v1/vulnerabilities", { params });
+    return response.data;
+  },
+
+  // Запросить оценку времени простоя для применения исправления
+  estimateDowntime: async (request: RemediationRequest): Promise<DowntimeEstimate> => {
+    const response = await api.post("/v1/remediation/estimate", request);
+    return response.data;
+  },
+
+  // Применить исправление
+  applyRemediation: async (request: RemediationRequest): Promise<any> => {
+    const response = await api.post("/v1/remediation/apply", request);
+    return response.data;
+  },
+
+  // Экспортировать отчет о сканировании
+  exportReport: async (scanId: string, format: 'json' | 'csv' = 'json'): Promise<Blob> => {
+    const response = await api.get(`/v1/scan/${scanId}/report`, { 
       params: { format },
-      responseType: 'blob',
+      responseType: 'blob'
     });
     return response.data;
+  },
+
+  // Вспомогательная функция для скачивания отчета
+  downloadReport: async (scanId: string, format: 'json' | 'csv' = 'json'): Promise<void> => {
+    try {
+      const blob = await scanService.exportReport(scanId, format);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aegis-scan-report-${scanId}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading report:', error);
+      throw error;
+    }
   },
 
   // Получить доступные стратегии исправления
@@ -117,38 +158,18 @@ export const scanService = {
     ];
   },
 
-  // Применить стратегию исправления
-  applyRemediation: async (
-    vulnerabilityId: string, 
-    strategyId: string
-  ): Promise<{ success: boolean; message: string }> => {
-    const response = await api.post(`/remediation`, {
-      vulnerability_id: vulnerabilityId,
-      strategy_id: strategyId,
-    });
+  // Получить статус и результаты сканирования
+  getScanStatus: async (scanId: string): Promise<ScanResult> => {
+    const response = await api.get(`/scan/${scanId}`);
     return response.data;
   },
 
-  // Рассчитать оценку времени простоя
-  estimateDowntime: async (
-    containerIds: string[], 
-    strategyId: string,
-    parallelism: number = 1
-  ): Promise<DowntimeEstimate> => {
-    const strategies = scanService.getRemediationStrategies();
-    const strategy = strategies.find(s => s.id === strategyId);
-    
-    if (!strategy) {
-      throw new Error('Стратегия не найдена');
-    }
-    
-    const containerCount = containerIds.length;
-    const batchCount = Math.ceil(containerCount / parallelism);
-    const totalTime = batchCount * strategy.estimatedTime;
-    
-    return {
-      totalTime,
-      affectedContainers: containerCount
-    };
+  // Скачать отчет сканирования
+  downloadScanReport: async (scanId: string, format: 'json' | 'csv' = 'json'): Promise<Blob> => {
+    const response = await api.get(`/scan/${scanId}/report`, {
+      params: { format },
+      responseType: 'blob',
+    });
+    return response.data;
   }
 }; 

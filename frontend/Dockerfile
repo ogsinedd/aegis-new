@@ -7,35 +7,37 @@ RUN apk add --no-cache nodejs npm bash
 FROM base AS deps
 WORKDIR /app
 
-# Копируем файлы package.json и устанавливаем все зависимости одной командой
+# Копируем файлы package.json и устанавливаем зависимости
 COPY package.json package-lock.json* ./
-RUN npm install --force class-variance-authority clsx tailwind-merge \
-    @radix-ui/react-slot @radix-ui/react-dialog @radix-ui/react-dropdown-menu \
-    @radix-ui/react-select @radix-ui/react-tooltip \
-    axios date-fns lucide-react sonner \
-    tailwindcss postcss autoprefixer @tailwindcss/forms && \
-    npm install --force
+
+# Установка зависимостей с кэшированием
+RUN npm ci --only=production && \
+    cp -R node_modules prod_node_modules && \
+    npm ci
 
 # Сборка приложения
 FROM base AS builder
 WORKDIR /app
 
-# Копируем файлы зависимостей из предыдущего шага
+# Копируем зависимости из предыдущего шага
 COPY --from=deps /app/node_modules ./node_modules
 
-# Копируем исходный код
+# Копируем весь исходный код
 COPY . .
 
 # Отключаем телеметрию Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Копируем, запускаем скрипт установки компонентов и выполняем сборку
-RUN chmod +x docker-utils/setup-components.sh && \
-    ./docker-utils/setup-components.sh && \
-    if [ ! -f postcss.config.js ]; then \
+# Создаем файл .env.production с переменными окружения
+RUN echo "NEXT_PUBLIC_API_URL=http://backend:8000/v1" > .env.production
+
+# Проверяем наличие postcss.config.js, и создаем его если отсутствует
+RUN if [ ! -f postcss.config.js ]; then \
         echo "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };" > postcss.config.js; \
-    fi && \
-    npm run build || (cat .next/error.log && exit 1)
+    fi
+
+# Выполняем сборку приложения
+RUN npm run build || (cat .next/error.log && exit 1)
 
 # Производственный образ
 FROM base AS runner
@@ -44,23 +46,23 @@ WORKDIR /app
 # Задаем переменные окружения
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV PORT 3000
 
 # Создаем непривилегированного пользователя
 RUN addgroup -S -g 1001 nodejs && \
-    adduser -S -u 1001 -G nodejs nextjs
+    adduser -S -u 1001 -G nodejs nextjs && \
+    mkdir -p /app/.next && \
+    chown -R nextjs:nodejs /app
 
-# Копируем статические файлы и сборку
-COPY --from=builder /app/public ./public
-RUN mkdir -p .next && chown nextjs:nodejs .next
-
-# Копируем оптимизированные файлы сборки
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Копируем только необходимые файлы из builder
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=deps --chown=nextjs:nodejs /app/prod_node_modules ./node_modules
 
 # Переключаемся на непривилегированного пользователя
 USER nextjs
 
 # Настройка порта и запуск
 EXPOSE 3000
-ENV PORT 3000
 CMD ["node", "server.js"] 

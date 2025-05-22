@@ -9,14 +9,37 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 30000, // 30 секунд таймаут
 });
 
-// Обработчик ошибок
+// Добавление токена авторизации, если есть
+api.interceptors.request.use((config) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Улучшенный обработчик ошибок
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("API Error:", error.response || error);
-    return Promise.reject(error);
+    const errorMessage = error.response?.data?.message || error.message || "Произошла ошибка";
+    
+    // Обработка ошибок авторизации
+    if (error.response?.status === 401) {
+      // Очистка localStorage при истечении токена
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
+    }
+    
+    return Promise.reject({
+      status: error.response?.status || 500,
+      message: errorMessage,
+      data: error.response?.data
+    });
   }
 );
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LucideShield } from "lucide-react";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const Navbar = () => {
   const pathname = usePathname();
@@ -46,12 +47,7 @@ const Navbar = () => {
         </Link>
       </nav>
       <div>
-        <button
-          className="rounded-full bg-secondary p-2"
-          title="Переключить тему"
-        >
-          🌙
-        </button>
+        <ThemeToggle />
       </div>
     </header>
   );

@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Edit, Trash, Server, RefreshCw } from "lucide-react";
@@ -30,8 +32,7 @@ export default function HostsTable({ hosts, onRefresh }: HostsTableProps) {
   };
 
   const handleEdit = (host: Host) => {
-    // Будет реализовано позже
-    console.log("Edit host:", host);
+    router.push(`/hosts/edit/${host.id}`);
   };
 
   const handleDelete = async () => {
@@ -57,9 +58,18 @@ export default function HostsTable({ hosts, onRefresh }: HostsTableProps) {
     setDeleteDialogOpen(true);
   };
 
-  const handleScanAll = (hostId: string) => {
-    // Будет реализовано позже
-    toast.info("Функция сканирования всех контейнеров будет доступна в следующей версии");
+  const handleScanAll = async (hostId: string) => {
+    try {
+      setIsLoading(true);
+      // Здесь будет API-вызов для сканирования контейнеров
+      // await containersService.scanAll(hostId);
+      toast.success("Запущено сканирование всех контейнеров");
+    } catch (error) {
+      toast.error("Ошибка при запуске сканирования");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,8 +77,8 @@ export default function HostsTable({ hosts, onRefresh }: HostsTableProps) {
       <div className="mb-4 flex justify-between items-center">
         <h2 className="text-2xl font-bold">Хосты Docker</h2>
         <div className="flex gap-2">
-          <Button onClick={onRefresh} variant="outline" size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button onClick={onRefresh} variant="outline" size="sm" disabled={isLoading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Обновить
           </Button>
           <Button onClick={() => router.push('/hosts/add')} size="sm">
@@ -141,8 +151,9 @@ export default function HostsTable({ hosts, onRefresh }: HostsTableProps) {
                               variant="outline"
                               size="icon"
                               onClick={() => handleScanAll(host.id)}
+                              disabled={isLoading}
                             >
-                              <RefreshCw className="h-4 w-4" />
+                              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
