@@ -7,12 +7,10 @@ RUN apk add --no-cache nodejs npm
 FROM base AS deps
 WORKDIR /app
 
-# Копируем файлы package.json и устанавливаем зависимости
+# Копируем файлы package.json и устанавливаем зависимости одной командой
 COPY package.json package-lock.json* ./
-
-# Устанавливаем все необходимые зависимости принудительно
-RUN npm install --force clsx tailwind-merge sonner date-fns axios lucide-react
-RUN npm ci --force
+RUN npm install --force clsx tailwind-merge sonner date-fns axios lucide-react && \
+    npm ci --force
 
 # Сборка приложения
 FROM base AS builder
@@ -27,24 +25,18 @@ COPY . .
 # Отключаем телеметрию Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Создаем lib/utils.ts и другие необходимые компоненты, если они отсутствуют
-RUN mkdir -p src/lib src/components/ui
-
-# Создаем utils.ts, если он не существует
-RUN if [ ! -f src/lib/utils.ts ]; then \
-    echo 'import { type ClassValue, clsx } from "clsx"; \
-    import { twMerge } from "tailwind-merge"; \
-    export function cn(...inputs: ClassValue[]) { \
-      return twMerge(clsx(inputs)); \
-    }' > src/lib/utils.ts; \
-    fi
-
-# Запускаем npx shadcn для создания компонентов UI
-RUN npx shadcn@latest init --yes
-RUN npx shadcn@latest add badge button card dialog dropdown-menu select tooltip --yes
-
-# Выполняем сборку приложения
-RUN npm run build
+# Создаем необходимые компоненты и выполняем сборку в одном слое
+RUN mkdir -p src/lib src/components/ui && \
+    if [ ! -f src/lib/utils.ts ]; then \
+        echo 'import { type ClassValue, clsx } from "clsx"; \
+        import { twMerge } from "tailwind-merge"; \
+        export function cn(...inputs: ClassValue[]) { \
+          return twMerge(clsx(inputs)); \
+        }' > src/lib/utils.ts; \
+    fi && \
+    npx shadcn@latest init --yes && \
+    npx shadcn@latest add badge button card dialog dropdown-menu select tooltip --yes && \
+    npm run build
 
 # Производственный образ
 FROM base AS runner
@@ -54,16 +46,14 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Создаем непривилегированного пользователя
-RUN addgroup -S -g 1001 nodejs
-RUN adduser -S -u 1001 -G nodejs nextjs
+# Создаем непривилегированного пользователя и подготавливаем директории в одном слое
+RUN addgroup -S -g 1001 nodejs && \
+    adduser -S -u 1001 -G nodejs nextjs && \
+    mkdir -p .next && \
+    chown -R nextjs:nodejs .next
 
 # Копируем статические файлы и сборку
 COPY --from=builder /app/public ./public
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Копируем оптимизированные файлы сборки
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 

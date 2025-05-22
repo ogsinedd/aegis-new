@@ -484,4 +484,14 @@ cat > /app/src/app/globals.css << 'EOL'
 }
 EOL
 
+# Создаем postcss.config.js
+cat > /app/postcss.config.js << 'EOL'
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+EOL
+
 echo "Компоненты UI и конфигурация успешно установлены" 

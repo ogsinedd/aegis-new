@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-# Установка Trivy
+# Установка Trivy и зависимостей в одном слое
 RUN apt-get update && \
     apt-get install -y wget apt-transport-https gnupg lsb-release && \
     wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | tee /usr/share/keyrings/trivy.gpg > /dev/null && \

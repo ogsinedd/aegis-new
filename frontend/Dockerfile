@@ -7,15 +7,14 @@ RUN apk add --no-cache nodejs npm bash
 FROM base AS deps
 WORKDIR /app
 
-# Копируем файлы package.json
+# Копируем файлы package.json и устанавливаем все зависимости одной командой
 COPY package.json package-lock.json* ./
-
-# Устанавливаем все необходимые зависимости
-RUN npm install --force class-variance-authority clsx tailwind-merge
-RUN npm install --force @radix-ui/react-slot @radix-ui/react-dialog @radix-ui/react-dropdown-menu
-RUN npm install --force @radix-ui/react-select @radix-ui/react-tooltip
-RUN npm install --force axios date-fns lucide-react sonner
-RUN npm install --force
+RUN npm install --force class-variance-authority clsx tailwind-merge \
+    @radix-ui/react-slot @radix-ui/react-dialog @radix-ui/react-dropdown-menu \
+    @radix-ui/react-select @radix-ui/react-tooltip \
+    axios date-fns lucide-react sonner \
+    tailwindcss postcss autoprefixer @tailwindcss/forms && \
+    npm install --force
 
 # Сборка приложения
 FROM base AS builder
@@ -30,13 +29,13 @@ COPY . .
 # Отключаем телеметрию Next.js
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Копируем и запускаем скрипт установки компонентов
-COPY docker-utils/setup-components.sh /tmp/
-RUN chmod +x /tmp/setup-components.sh
-RUN /tmp/setup-components.sh
-
-# Выполняем сборку приложения
-RUN npm run build || (cat .next/error.log && exit 1)
+# Копируем, запускаем скрипт установки компонентов и выполняем сборку
+RUN chmod +x docker-utils/setup-components.sh && \
+    ./docker-utils/setup-components.sh && \
+    if [ ! -f postcss.config.js ]; then \
+        echo "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };" > postcss.config.js; \
+    fi && \
+    npm run build || (cat .next/error.log && exit 1)
 
 # Производственный образ
 FROM base AS runner
@@ -47,13 +46,12 @@ ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
 # Создаем непривилегированного пользователя
-RUN addgroup -S -g 1001 nodejs
-RUN adduser -S -u 1001 -G nodejs nextjs
+RUN addgroup -S -g 1001 nodejs && \
+    adduser -S -u 1001 -G nodejs nextjs
 
 # Копируем статические файлы и сборку
 COPY --from=builder /app/public ./public
-RUN mkdir -p .next
-RUN chown nextjs:nodejs .next
+RUN mkdir -p .next && chown nextjs:nodejs .next
 
 # Копируем оптимизированные файлы сборки
 COPY --from=builder /app/.next/standalone ./
