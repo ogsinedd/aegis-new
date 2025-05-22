@@ -3,18 +3,18 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package files first for better caching
-COPY package*.json ./
-
-# First generate package-lock.json and then install dependencies
-RUN npm install
-
-# Copy the rest of the application code
+# Сначала копируем все файлы проекта
 COPY . .
 
-# Build the application
-# The `VITE_API_URL` will be passed during docker-compose build or runtime if needed for build step,
-# but for client-side code, it's better to use runtime env variables.
+# Затем устанавливаем зависимости
+RUN npm install
+
+# Проверяем наличие важных файлов
+RUN ls -la src/lib/utils.ts && \
+    echo "utils.ts exists" || \
+    echo "utils.ts not found"
+
+# Собираем приложение
 RUN npm run build
 
 # Stage 2: Serve the application with Caddy
