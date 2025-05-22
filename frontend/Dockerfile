@@ -11,9 +11,9 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Установка зависимостей с кэшированием
-RUN npm ci --only=production && \
+RUN npm ci --omit=dev --legacy-peer-deps && \
     cp -R node_modules prod_node_modules && \
-    npm ci
+    npm ci --legacy-peer-deps
 
 # Сборка приложения
 FROM base AS builder
@@ -30,6 +30,17 @@ ENV NEXT_TELEMETRY_DISABLED 1
 
 # Создаем файл .env.production с переменными окружения
 RUN echo "NEXT_PUBLIC_API_URL=http://backend:8000/v1" > .env.production
+
+# Проверяем наличие директорий и файлов
+RUN mkdir -p src/lib src/components/ui
+RUN if [ ! -f src/lib/utils.ts ]; then \
+    echo 'import { type ClassValue, clsx } from "clsx";' > src/lib/utils.ts && \
+    echo 'import { twMerge } from "tailwind-merge";' >> src/lib/utils.ts && \
+    echo '' >> src/lib/utils.ts && \
+    echo 'export function cn(...inputs: ClassValue[]) {' >> src/lib/utils.ts && \
+    echo '  return twMerge(clsx(inputs));' >> src/lib/utils.ts && \
+    echo '}' >> src/lib/utils.ts; \
+fi
 
 # Проверяем наличие postcss.config.js, и создаем его если отсутствует
 RUN if [ ! -f postcss.config.js ]; then \
