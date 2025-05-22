@@ -39,6 +39,10 @@ class VulnerabilityBase(BaseModel):
     recommendation: Optional[str] = None
     details: Optional[Dict[str, Any]] = None
 
+# Schema for creating a new vulnerability
+class VulnerabilityCreate(VulnerabilityBase):
+    scan_id: str
+
 # Schema for vulnerability in response
 class Vulnerability(VulnerabilityBase):
     id: str
